@@ -37,7 +37,7 @@
 
     - name: Add Adoptium apt repository
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb {{ ansible_distribution_release }} main"
+        repo: "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb {{ ansible_facts['distribution_release'] }} main"        
         state: present
         filename: adoptium
 

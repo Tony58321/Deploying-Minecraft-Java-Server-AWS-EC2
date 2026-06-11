@@ -19,7 +19,7 @@ variable "instance_type" {
 variable "public_key_path" {
   description = "Path to the local public SSH key Terraform will upload to AWS."
   type        = string
-  default     = "C:/2025-26/System Admin/AWS/minecraft-key.pub"
+  default     = "~/.ssh/minecraft-key.pub"
 }
 
 variable "allowed_ssh_cidr" {

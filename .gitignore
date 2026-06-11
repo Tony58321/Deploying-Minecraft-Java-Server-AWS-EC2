@@ -17,3 +17,6 @@ minecraft_aws_key.pub
 # OS/editor files
 .DS_Store
 .vscode/
+
+# Generated Ansible inventory
+ansible/inventory.ini
