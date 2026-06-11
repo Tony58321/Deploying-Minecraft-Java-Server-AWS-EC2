@@ -1,0 +1,130 @@
+---
+- name: Configure Minecraft Java Edition server
+  hosts: minecraft
+  become: true
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - wget
+          - curl
+          - gpg
+          - apt-transport-https
+          - jq
+        state: present
+
+    - name: Create apt keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Adoptium GPG key
+      ansible.builtin.get_url:
+        url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+        dest: /tmp/adoptium.gpg
+        mode: "0644"
+
+    - name: Convert Adoptium GPG key
+      ansible.builtin.command:
+        cmd: gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg /tmp/adoptium.gpg
+        creates: /etc/apt/keyrings/adoptium.gpg
+
+    - name: Add Adoptium apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb {{ ansible_distribution_release }} main"
+        state: present
+        filename: adoptium
+
+    - name: Install Java 25
+      ansible.builtin.apt:
+        name: temurin-25-jdk
+        state: present
+        update_cache: true
+
+    - name: Create Minecraft server directory
+      ansible.builtin.file:
+        path: /home/ubuntu/minecraft
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Get latest Minecraft version metadata URL
+      ansible.builtin.shell: |
+        curl -s https://launchermeta.mojang.com/mc/game/version_manifest.json | jq -r '.latest.release as $latest | .versions[] | select(.id == $latest) | .url'
+      register: minecraft_version_url
+      changed_when: false
+
+    - name: Get latest Minecraft server jar URL
+      ansible.builtin.shell: |
+        curl -s "{{ minecraft_version_url.stdout }}" | jq -r '.downloads.server.url'
+      register: minecraft_server_jar_url
+      changed_when: false
+
+    - name: Download Minecraft server jar
+      ansible.builtin.get_url:
+        url: "{{ minecraft_server_jar_url.stdout }}"
+        dest: /home/ubuntu/minecraft/server.jar
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Accept Minecraft EULA
+      ansible.builtin.copy:
+        dest: /home/ubuntu/minecraft/eula.txt
+        content: "eula=true\n"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Create Minecraft start script
+      ansible.builtin.copy:
+        dest: /home/ubuntu/minecraft/start.sh
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          cd /home/ubuntu/minecraft
+          java -Xmx2G -Xms2G -jar server.jar nogui
+
+    - name: Create systemd service for Minecraft
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/minecraft.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Minecraft Java Edition Server
+          After=network.target
+
+          [Service]
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/minecraft
+          ExecStart=/home/ubuntu/minecraft/start.sh
+          Restart=on-failure
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start Minecraft service
+      ansible.builtin.systemd:
+        name: minecraft
+        enabled: true
+        state: started
+
+    - name: Wait for Minecraft port 25565 to become available
+      ansible.builtin.wait_for:
+        port: 25565
+        host: 0.0.0.0
+        timeout: 180

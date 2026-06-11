@@ -1,0 +1,19 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+crash.log
+crash.*.log
+
+# SSH keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+minecraft_aws_key
+minecraft_aws_key.pub
+
+# OS/editor files
+.DS_Store
+.vscode/
